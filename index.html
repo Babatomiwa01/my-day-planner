@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AYS – At Your Service</title>
+<style>
+:root{--bg:#f3f6f4;--card:#fff;--ink:#1c2b26;--mute:#6b7b75;--line:#dbe4df;--acc:#1f6f5c;--now:#e3f3ec;--bad:#b3261e;--badbg:#fbe9e7;--fix:#fff4d6}
+@media(prefers-color-scheme:dark){:root{--bg:#121816;--card:#1a2320;--ink:#e6efeb;--mute:#93a49d;--line:#2b3833;--acc:#5ec4a6;--now:#1e3a31;--bad:#ff8a80;--badbg:#3a1f1c;--fix:#3b3212}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 Georgia,'Times New Roman',serif;padding:16px;max-width:680px;margin-inline:auto}
+h1{font-size:26px;margin:8px 0 4px}
+.sub{color:var(--mute);margin:0 0 16px;font-size:14px}
+.box{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.row:last-child{margin-bottom:0}
+label{font-weight:bold}
+input[type=time],input[type=text],input[type=number]{font:inherit;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+input[type=text]{flex:1;min-width:150px}
+input[type=number]{width:90px}
+button{font:inherit;padding:9px 14px;border:0;border-radius:8px;background:var(--acc);color:var(--bg);cursor:pointer}
+button.sm{padding:4px 9px;font-size:13px;background:transparent;color:var(--acc);border:1px solid var(--line)}
+button.sm.del{color:var(--bad)}
+button.ghost{background:transparent;color:var(--mute);border:1px solid var(--line)}
+button:focus-visible,input:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+#err{color:var(--bad);font-size:14px}
+#clock{margin:14px 2px 6px;color:var(--mute);font-size:14px}
+ul{list-style:none;padding:0;margin:0}
+li{display:flex;gap:12px;align-items:flex-start;background:var(--card);border:1px solid var(--line);border-left:5px solid var(--line);border-radius:10px;padding:12px;margin-bottom:8px}
+li.now{background:var(--now);border-left-color:var(--acc)}
+li.done{opacity:.6}
+li.done .name{text-decoration:line-through}
+li.missed{background:var(--badbg);border-left-color:var(--bad)}
+li.fixed{border-left-color:#d9a400}
+li.brk{padding:8px 12px;font-size:14px}
+li input[type=checkbox]{width:24px;height:24px;margin-top:2px;accent-color:var(--acc);flex:none}
+.main{flex:1}
+.name{font-weight:bold}
+.time{color:var(--mute);font-size:14px}
+.tag{font-size:13px;margin-top:2px}
+.missed .tag{color:var(--bad)}
+.now .tag{color:var(--acc)}
+.fixed .time::after{content:" (fixed)";background:var(--fix);padding:1px 6px;border-radius:6px}
+.acts{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
+.note{color:var(--mute);font-size:13px;margin-top:14px}
+header{display:flex;align-items:center;gap:14px;background:linear-gradient(135deg,#1f6f5c,#2e9c82);color:#fff;border-radius:14px;padding:16px;margin-bottom:10px}
+.logo{font:bold 22px Georgia,serif;letter-spacing:2px;background:rgba(255,255,255,.18);border-radius:12px;padding:10px 12px}
+.brand{font-size:20px;font-weight:bold}
+.plan{font-size:13px;letter-spacing:1.5px;text-transform:uppercase;opacity:.85}
+.hi{font-size:26px;font-weight:bold;line-height:1.15;margin-top:4px}
+button.big{font-size:17px;padding:12px 22px;border-radius:999px}
+button:disabled{opacity:.5;cursor:not-allowed}
+.result{text-align:center;border:2px solid var(--acc)}
+.pct{font:bold 56px Georgia,serif;color:var(--acc);line-height:1.1}
+.msg{font-size:18px;font-weight:bold;margin:4px 0}
+#cf{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:10}
+.strip{display:flex;gap:8px;overflow-x:auto;padding:4px 2px 10px;margin-bottom:6px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch}
+button.d{flex:none;width:72px;scroll-snap-align:start;display:flex;flex-direction:column;align-items:center;gap:2px;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:14px;padding:8px 0}
+button.d b{font-size:24px;line-height:1.1}
+button.d span{font-size:11px;color:var(--mute);text-transform:uppercase}
+button.d.sel{background:var(--acc);color:var(--bg);border-color:var(--acc)}
+button.d.sel span{color:inherit;opacity:.85}
+</style>
+</head>
+<body>
+<header><div class="logo">AYS</div><div><div class="brand">At Your Service</div><div class="plan">My Day Planner</div><div class="hi" id="hi"></div></div></header>
+<p class="sub">Press Start when you wake up. Tick each task as you finish and the next one begins right away.</p>
+
+<div class="strip" id="strip" role="group" aria-label="Choose a day"></div>
+
+<div class="box"><div class="row"><button id="start" class="big">Start my day</button><span id="started" class="time"></span></div></div>
+
+<div class="box result" id="result" hidden><div class="pct" id="pct"></div><div class="msg" id="msg"></div><div class="time" id="rsub"></div></div>
+
+<div class="box">
+  <div class="row">
+    <input type="text" id="tname" placeholder="Task name" aria-label="Task name" maxlength="80">
+    <input type="number" id="tdur" placeholder="Mins" aria-label="Minutes" min="5" max="600">
+  </div>
+  <div class="row">
+    <label><input type="checkbox" id="tfix"> Fixed time</label>
+    <span id="fixbox" hidden><input type="time" id="fs" aria-label="Fixed start"> to <input type="time" id="fe" aria-label="Fixed end"></span>
+  </div>
+  <div class="row"><button id="save">Add task</button><button id="cancel" class="ghost" hidden>Cancel</button><span id="err" role="alert"></span></div>
+</div>
+
+<div id="clock"></div>
+<ul id="list"></ul>
+<p class="note" id="note"></p>
+<button id="copy" class="ghost" hidden>Copy today's list</button>
+<canvas id="cf" aria-hidden="true"></canvas>
+
+<script>
+var GRACE=30,items=[],editing=null,state=null,store=null,selKey=null;
+function uid(){return "k"+Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
+function fmt(m){var h=Math.floor(m/60)%24,mm=m%60,ap=h>=12?"PM":"AM";h=h%12||12;return h+":"+(mm<10?"0":"")+mm+" "+ap}
+function hhmm(m){return("0"+Math.floor(m/60)).slice(-2)+":"+("0"+m%60).slice(-2)}
+function parse(v){if(!v)return null;var p=v.split(":");return+p[0]*60+ +p[1]}
+function nowMin(){var d=new Date();return d.getHours()*60+d.getMinutes()}
+function save(){try{localStorage.setItem("planner5",JSON.stringify(store))}catch(e){}}
+function key(d){return d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2)}
+function todayKey(){return key(new Date())}
+function viewingToday(){return selKey===todayKey()}
+function newDay(t){return{tasks:t,doneAt:{},wake:360,started:false,finished:false,result:null,confetti:false}}
+function clone(ts){return ts.map(function(t){var c=Object.assign({},t);c.id=uid();return c})}
+function defaults(){
+  var B="Bathroom and leg break",L=[["AI Badge (40 mins)",40],[B,10],["Finance market 23–29",60],[B,10],
+   ["Data governance: what we did (practical)",30],[B,10],["Data governance: reading for class",30],[B,10],
+   ["Finance market 30–36",60],[B,10],["Practice AI Badge (40 mins)",40],[B,10],["Finance market 37–42",60],[B,10],
+   ["Write half a page for LinkedIn",20],[B,10],["Finance market 42–48",60],["Finance market 48–51",60]];
+  var t=L.map(function(x){return{id:uid(),name:x[0],dur:x[1]}});
+  t.push({id:uid(),name:"Google presentation",fixed:true,fs:780,fe:840});
+  t.push({id:uid(),name:"Food break",fixed:true,fs:840,fe:870});
+  return t;
+}
+function load(){
+  var s=null,tk=todayKey();try{s=JSON.parse(localStorage.getItem("planner5"))}catch(e){}
+  if(!s||!s.days){
+    s={days:{}};var o=null;try{o=JSON.parse(localStorage.getItem("planner4"))}catch(e){}
+    if(o&&o.tasks)s.days[tk]=(o.day===new Date().toDateString())?o:newDay(o.tasks);
+    else s.days[tk]=newDay(defaults());
+  }
+  if(!s.days[tk]){ // a new day: reuse the latest earlier list that has tasks
+    var ks=Object.keys(s.days).filter(function(k){return k<tk&&s.days[k].tasks.length}).sort();
+    s.days[tk]=newDay(clone(ks.length?s.days[ks[ks.length-1]].tasks:defaults()));
+  }
+  store=s;selKey=tk;state=s.days[tk];save();
+}
+var DN=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"],MN=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+function renderStrip(){
+  var el=document.getElementById("strip"),t=new Date(),sl=el.scrollLeft;el.innerHTML="";el.dataset.k=todayKey();
+  for(var i=0;i<30;i++){
+    var d=new Date(t.getFullYear(),t.getMonth(),t.getDate()+i),k=key(d),b=document.createElement("button");
+    b.className="d"+(k===selKey?" sel":"");b.setAttribute("aria-pressed",k===selKey);
+    b.innerHTML="<span>"+DN[d.getDay()]+"</span><b>"+d.getDate()+"</b><span>"+(i===0?"Today":MN[d.getMonth()])+"</span>";
+    b.onclick=(function(k){return function(){selectDay(k)}})(k);
+    el.appendChild(b);
+  }
+  el.scrollLeft=sl;
+}
+function selectDay(k){
+  if(!store.days[k])store.days[k]=newDay([]);
+  selKey=k;state=store.days[k];stopEdit();renderStrip();save();render();
+}
+
+// Builds the schedule. A ticked task moves the next one to start immediately.
+function build(){
+  var D=state.doneAt,out=[],cur=state.wake;
+  var q=state.tasks.filter(function(t){return!t.fixed}).map(function(t){return{id:t.id,key:t.id,n:t.name,d:t.dur,first:true}});
+  var F=state.tasks.filter(function(t){return t.fixed}).sort(function(a,b){return a.fs-b.fs});
+  function place(o,d){
+    var it={id:o.id,key:o.key,n:o.n,s:cur,e:cur+d,pe:cur+d,first:o.first};
+    if(D[o.key]!==undefined){cur=Math.max(D[o.key],cur);it.e=cur}else cur+=d;
+    out.push(it);
+  }
+  function placeF(){
+    var f=F.shift();
+    out.push({id:f.id,key:f.id,n:f.name,s:f.fs,e:f.fe,pe:f.fe,fixed:true,first:true});
+    cur=Math.max(cur,f.fe,D[f.id]!==undefined?D[f.id]:0);
+  }
+  while(q.length||F.length){
+    var f=F[0];
+    if(!q.length||(f&&cur>=f.fs)){placeF();continue}
+    var t=q[0];
+    if(f&&cur+t.d>f.fs){
+      var room=f.fs-cur;
+      if(room>=10&&t.d>15){
+        q.shift();
+        place({id:t.id,key:t.key+"|a",n:t.n+" (part 1)",first:t.first},room);
+        q.unshift({id:t.id,key:t.key+"|b",n:t.n+" (part 2)",d:t.d-room});
+      }else placeF();
+      continue;
+    }
+    q.shift();place(t,t.d);
+  }
+  out.sort(function(a,b){return a.s-b.s});
+  return out;
+}
+
+function render(){
+  var list=document.getElementById("list");list.innerHTML="";
+  var tk=todayKey(),td=viewingToday();
+  if(document.getElementById("strip").dataset.k!==tk){
+    if(!store.days[tk])store.days[tk]=newDay([]);
+    if(selKey<tk){selKey=tk;state=store.days[tk];td=true}
+    renderStrip();
+  }
+  var n=td?nowMin():-1,D=state.doneAt;
+  if(!state.started)state.wake=td?nowMin():360;
+  var started=!!state.started;
+  items=build();
+  var locked={};
+  items.forEach(function(it){if(D[it.key]!==undefined||n>=it.pe+GRACE)locked[it.id]=true});
+  var anyDone=Object.keys(D).length>0;
+  items.forEach(function(it,i){
+    var done=D[it.key]!==undefined,over=n>=it.pe+GRACE,missed=!done&&over,cls="",tag="";
+    var blocked=false;
+    for(var j=0;j<i;j++){var p=items[j];
+      if(D[p.key]===undefined&&n<p.pe+GRACE&&!(p.fixed&&n>=p.pe))blocked=true}
+    var laterDone=false;for(var k=i+1;k<items.length;k++)if(D[items[k].key]!==undefined)laterDone=true;
+    var early=it.fixed&&n<it.s;
+    if(done){cls="done";tag="Done ✅ at "+fmt(D[it.key])}
+    else if(missed){cls="missed";tag="❌ Not done"}
+    else if(n>=it.s&&n<it.e){cls="now";tag="Do this now"}
+    else if(n>=it.e){tag="Time is up. Tick it in the next "+(it.pe+GRACE-n)+" min"}
+    if(!started){cls="";tag=""}
+    if(it.fixed)cls+=" fixed";
+    var li=document.createElement("li");li.className=cls;
+    var cb=document.createElement("input");cb.type="checkbox";cb.checked=done;
+    cb.disabled=!started||over||laterDone||(!done&&(blocked||early));
+    cb.setAttribute("aria-label","Mark "+it.n+" as done");
+    cb.onchange=function(){if(cb.checked)D[it.key]=nowMin();else delete D[it.key];save();render()};
+    var box=document.createElement("div");box.className="main";
+    box.innerHTML='<div class="name"></div><div class="time">'+fmt(it.s)+' to '+fmt(it.e)+' ('+(it.e-it.s)+' min)</div><div class="tag">'+tag+'</div>';
+    box.querySelector(".name").textContent=it.n;
+    if(it.first&&!locked[it.id]){
+      var acts=document.createElement("div");acts.className="acts";
+      var idx=state.tasks.findIndex(function(t){return t.id===it.id});
+      function btn(txt,cls2,fn,dis,label){var b=document.createElement("button");b.className="sm "+cls2;b.textContent=txt;b.disabled=!!dis;b.setAttribute("aria-label",label);b.onclick=fn;acts.appendChild(b)}
+      btn("Edit","",function(){startEdit(it.id)},false,"Edit "+it.n);
+      btn("Delete","del",function(){if(confirm("Delete \""+it.n+"\"?")){state.tasks.splice(idx,1);if(editing===it.id)stopEdit();save();render()}},false,"Delete "+it.n);
+      if(!it.fixed){
+        var prev=state.tasks[idx-1],next=state.tasks[idx+1];
+        btn("▲","",function(){mv(idx,-1)},!prev||locked[prev.id],"Move up");
+        btn("▼","",function(){mv(idx,1)},!next||locked[next.id],"Move down");
+      }
+      box.appendChild(acts);
+    }
+    li.appendChild(cb);li.appendChild(box);list.appendChild(li);
+  });
+  document.getElementById("clock").textContent=(td?"":"Preparing this date: ticking and Start unlock on the day. ")+"Now: "+fmt(nowMin())+". Unticked tasks turn ❌ 30 minutes after their end time and lock. Ticked or missed tasks can't be edited or deleted.";
+  document.getElementById("note").textContent=items.length?"Day ends around "+fmt(items[items.length-1].e)+".":"No tasks yet. Add one above.";
+  checkEnd();ui();
+}
+function mv(i,d){var t=state.tasks;var x=t[i];t[i]=t[i+d];t[i+d]=x;save();render()}
+
+function startEdit(id){
+  var t=state.tasks.find(function(x){return x.id===id});if(!t)return;
+  editing=id;
+  document.getElementById("tname").value=t.name;
+  document.getElementById("tdur").value=t.fixed?"":t.dur;
+  document.getElementById("tfix").checked=!!t.fixed;
+  document.getElementById("fs").value=t.fixed?hhmm(t.fs):"";
+  document.getElementById("fe").value=t.fixed?hhmm(t.fe):"";
+  document.getElementById("save").textContent="Save changes";
+  document.getElementById("cancel").hidden=false;
+  syncFix();document.getElementById("tname").focus();
+}
+function stopEdit(){
+  editing=null;["tname","tdur","fs","fe"].forEach(function(i){document.getElementById(i).value=""});
+  document.getElementById("tfix").checked=false;
+  document.getElementById("save").textContent="Add task";
+  document.getElementById("cancel").hidden=true;
+  document.getElementById("err").textContent="";syncFix();
+}
+function syncFix(){
+  var f=document.getElementById("tfix").checked;
+  document.getElementById("fixbox").hidden=!f;
+  document.getElementById("tdur").disabled=f;
+}
+document.getElementById("tfix").onchange=syncFix;
+document.getElementById("cancel").onclick=stopEdit;
+document.getElementById("save").onclick=function(){
+  var name=document.getElementById("tname").value.trim(),fix=document.getElementById("tfix").checked,err=document.getElementById("err");
+  var task={name:name};
+  if(!name){err.textContent="Enter a task name.";return}
+  if(fix){
+    var a=parse(document.getElementById("fs").value),b=parse(document.getElementById("fe").value);
+    if(a===null||b===null||b<=a){err.textContent="Set a start time and a later end time.";return}
+    task.fixed=true;task.fs=a;task.fe=b;
+  }else{
+    var d=parseInt(document.getElementById("tdur").value,10);
+    if(!(d>=5&&d<=600)){err.textContent="Minutes must be between 5 and 600.";return}
+    task.dur=d;
+  }
+  if(editing){
+    var i=state.tasks.findIndex(function(x){return x.id===editing});
+    if(i>-1){task.id=editing;state.tasks[i]=task}
+  }else{task.id=uid();state.tasks.push(task)}
+  stopEdit();save();render();
+};
+document.getElementById("copy").onclick=function(){
+  var src=store.days[todayKey()];if(!src)return;state.tasks=clone(src.tasks);save();render();
+};
+document.getElementById("start").onclick=function(){
+  if(state.started||state.finished||!viewingToday()||!state.tasks.length)return;
+  state.started=true;state.wake=nowMin();state.startAt=state.wake;save();render();
+};
+function ui(){
+  var b=document.getElementById("start"),h=new Date().getHours();
+  document.getElementById("hi").textContent=(h<12?"Good morning":h<17?"Good afternoon":"Good evening")+", BABATOMIWA";
+  b.disabled=!!(state.started||state.finished||!viewingToday());
+  b.textContent=state.finished?"Day complete":state.started?"Day started":"Start my day";
+  document.getElementById("started").textContent=!viewingToday()?"Preparing this day. Start opens on the day.":state.finished?"See you tomorrow.":state.started?"Started at "+fmt(state.startAt!==undefined?state.startAt:state.wake):"";
+  document.getElementById("copy").hidden=!(!viewingToday()&&!state.tasks.length);
+  var fx=document.getElementById("tfix").checked;
+  ["tname","tdur","tfix","fs","fe","save","cancel"].forEach(function(i){
+    document.getElementById(i).disabled=!!state.finished||(i==="tdur"&&fx);
+  });
+}
+function checkEnd(){
+  var n=nowMin(),D=state.doneAt,r=document.getElementById("result");
+  if(state.started&&!state.finished&&items.length&&items.every(function(i){return D[i.key]!==undefined||n>=i.pe+GRACE})){
+    var d=items.filter(function(i){return D[i.key]!==undefined}).length;
+    state.finished=true;state.done=d;state.total=items.length;state.result=Math.round(d/items.length*100);save();
+  }
+  if(!state.finished){r.hidden=true;return}
+  var p=state.result;
+  document.getElementById("pct").textContent=p+"%";
+  document.getElementById("msg").textContent=p===100?"Perfect day, BABATOMIWA! 🎉":p>=70?"Great work, BABATOMIWA!":p>=40?"Good effort, BABATOMIWA.":"Tomorrow is a fresh start, BABATOMIWA.";
+  document.getElementById("rsub").textContent=state.done+" of "+state.total+" tasks completed";
+  r.hidden=false;
+  if(p===100&&!state.confetti){state.confetti=true;save();confetti()}
+}
+function confetti(){
+  if(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches)return;
+  var c=document.getElementById("cf"),x=c.getContext("2d");c.width=innerWidth;c.height=innerHeight;
+  var cols=["#1f6f5c","#ffc857","#ff6b6b","#4ecdc4","#a78bfa","#f59e0b"],P=[],t=0;
+  for(var i=0;i<170;i++)P.push({x:Math.random()*c.width,y:-20-Math.random()*c.height*.5,w:6+Math.random()*6,h:8+Math.random()*8,vx:-2+Math.random()*4,vy:2+Math.random()*4,r:Math.random()*6,vr:-.2+Math.random()*.4,c:cols[i%cols.length]});
+  (function f(){
+    x.clearRect(0,0,c.width,c.height);
+    P.forEach(function(p){p.x+=p.vx;p.y+=p.vy;p.r+=p.vr;x.save();x.translate(p.x,p.y);x.rotate(p.r);x.fillStyle=p.c;x.fillRect(-p.w/2,-p.h/2,p.w,p.h);x.restore()});
+    if(++t<280)requestAnimationFrame(f);else x.clearRect(0,0,c.width,c.height);
+  })();
+}
+load();renderStrip();syncFix();render();
+setInterval(render,30000);
+</script>
+</body>
+</html>

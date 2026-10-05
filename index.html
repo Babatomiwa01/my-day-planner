@@ -60,6 +60,14 @@ button.d b{font-size:24px;line-height:1.1}
 button.d span{font-size:11px;color:var(--mute);text-transform:uppercase}
 button.d.sel{background:var(--acc);color:var(--bg);border-color:var(--acc)}
 button.d.sel span{color:inherit;opacity:.85}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:16px;z-index:20}
+.modal[hidden]{display:none}
+.mbox{background:var(--card);color:var(--ink);border-radius:16px;padding:20px;max-width:420px;width:100%;max-height:85vh;overflow:auto}
+.mbox h2{margin:0 0 6px;font-size:24px}
+.mbox p{margin:0 0 12px;color:var(--mute)}
+.mbox input[type=text],.mbox input[type=time]{width:100%;margin-bottom:12px}
+.wga{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.chip{font-weight:normal;font-size:14px;border:1px solid var(--line);border-radius:999px;padding:6px 10px}
 </style>
 </head>
 <body>
@@ -68,7 +76,7 @@ button.d.sel span{color:inherit;opacity:.85}
 
 <div class="strip" id="strip" role="group" aria-label="Choose a day"></div>
 
-<div class="box"><div class="row"><button id="start" class="big">Start my day</button><span id="started" class="time"></span></div></div>
+<div class="box"><div class="row"><button id="start" class="big">Start my day</button><button id="wga" class="big ghost">WGA · We Go Again</button><span id="started" class="time"></span></div></div>
 
 <div class="box result" id="result" hidden><div class="pct" id="pct"></div><div class="msg" id="msg"></div><div class="time" id="rsub"></div></div>
 
@@ -88,6 +96,7 @@ button.d.sel span{color:inherit;opacity:.85}
 <ul id="list"></ul>
 <p class="note" id="note"></p>
 <button id="copy" class="ghost" hidden>Copy today's list</button>
+<div class="modal" id="modal" hidden role="dialog" aria-modal="true"><div class="mbox" id="mbox"></div></div>
 <canvas id="cf" aria-hidden="true"></canvas>
 
 <script>
@@ -147,7 +156,7 @@ function selectDay(k){
 function build(){
   var D=state.doneAt,out=[],cur=state.wake;
   var q=state.tasks.filter(function(t){return!t.fixed}).map(function(t){return{id:t.id,key:t.id,n:t.name,d:t.dur,first:true}});
-  var F=state.tasks.filter(function(t){return t.fixed}).sort(function(a,b){return a.fs-b.fs});
+  var F=state.tasks.filter(function(t){return t.fixed}).sort(function(a,b){return a.fs-b.fs}).filter(function(f){return!state.started||f.fe>state.wake});
   function place(o,d){
     var it={id:o.id,key:o.key,n:o.n,s:cur,e:cur+d,pe:cur+d,first:o.first};
     if(D[o.key]!==undefined){cur=Math.max(D[o.key],cur);it.e=cur}else cur+=d;
@@ -229,7 +238,8 @@ function render(){
     li.appendChild(cb);li.appendChild(box);list.appendChild(li);
   });
   document.getElementById("clock").textContent=(td?"":"Preparing this date: ticking and Start unlock on the day. ")+"Now: "+fmt(nowMin())+". Unticked tasks turn ❌ 30 minutes after their end time and lock. Ticked or missed tasks can't be edited or deleted.";
-  document.getElementById("note").textContent=items.length?"Day ends around "+fmt(items[items.length-1].e)+".":"No tasks yet. Add one above.";
+  var last=items.length?items[items.length-1].e:0,left=1440-nowMin(),R=state.rounds||[];
+  document.getElementById("note").textContent=(items.length?"Day ends around "+fmt(last)+".":"No tasks yet. Add one above.")+(last>1440?" ⚠ Your tasks run past midnight.":"")+(td&&R.length&&!state.finished?" "+Math.floor(left/60)+" hrs "+left%60+" mins left today.":"")+(R.length?" Earlier today: "+R.map(function(r,i){return"Round "+(i+1)+": "+r.result+"%"}).join(", ")+".":"");
   checkEnd();ui();
 }
 function mv(i,d){var t=state.tasks;var x=t[i];t[i]=t[i+d];t[i+d]=x;save();render()}
@@ -283,15 +293,72 @@ document.getElementById("copy").onclick=function(){
   var src=store.days[todayKey()];if(!src)return;state.tasks=clone(src.tasks);save();render();
 };
 document.getElementById("start").onclick=function(){
-  if(state.started||state.finished||!viewingToday()||!state.tasks.length)return;
-  state.started=true;state.wake=nowMin();state.startAt=state.wake;save();render();
+  if(!viewingToday()){selectDay(todayKey());return}
+  var m=document.getElementById("started");
+  if(state.finished)return more();
+  if(state.started){m.textContent="Your day is already running. Keep ticking!";return}
+  if(!state.tasks.length){m.textContent="Add a task first.";return}
+  startPick();
 };
+document.getElementById("wga").onclick=function(){wga()};
+function nm(){return store.name||"friend"}
+function greet(){var h=new Date().getHours();return h<12?"Good morning":h<17?"Good afternoon":"Good evening"}
+function modal(title,sub,body,btns){
+  var m=document.getElementById("modal"),b=document.getElementById("mbox");b.innerHTML="";
+  var h=document.createElement("h2");h.textContent=title;b.appendChild(h);
+  if(sub){var p=document.createElement("p");p.textContent=sub;b.appendChild(p)}
+  if(body)b.appendChild(body);
+  var r=document.createElement("div");r.className="row";
+  btns.forEach(function(x){var t=document.createElement("button");t.textContent=x.t;if(x.g)t.className="ghost";
+    t.onclick=function(){m.hidden=true;if(x.fn&&x.fn()===false)m.hidden=false};r.appendChild(t)});
+  b.appendChild(r);m.hidden=false;
+}
+function askName(){
+  var i=document.createElement("input");i.type="text";i.maxLength=30;i.placeholder="First name or nickname";i.setAttribute("aria-label","Your name");
+  modal("Welcome to AYS","What should I call you?",i,[{t:"Continue",fn:function(){var v=i.value.trim();if(!v){i.focus();return false}store.name=v;save();ui();welcome()}}]);
+  setTimeout(function(){i.focus()},50);
+}
+function welcome(){
+  var td=store.days[todayKey()],go=td&&!td.started&&!td.finished;
+  modal(greet()+", "+nm(),new Date().toLocaleDateString(undefined,{weekday:"long",day:"numeric",month:"long"}),null,go?[{t:"Choose when to start",fn:startPick}]:[{t:"Continue"}]);
+}
+function startPick(){
+  if(!viewingToday())selectDay(todayKey());
+  if(state.finished)return more();
+  if(state.started||!state.tasks.length)return;
+  var i=document.createElement("input");i.type="time";i.value=hhmm(nowMin());i.setAttribute("aria-label","Start time");
+  modal("Choose when to start","Your schedule begins at this time.",i,[{t:"Start",fn:function(){var v=parse(i.value);if(v===null)v=nowMin();state.started=true;state.wake=v;state.startAt=v;save();render()}},{t:"Cancel",g:1}]);
+}
+function more(){
+  modal("Another round?","Do you have time for more tasks before the end of today?",null,[{t:"Yes",fn:function(){
+    state.rounds=state.rounds||[];state.rounds.push({result:state.result,done:state.done,total:state.total,tasks:state.tasks});
+    state.tasks=[];state.doneAt={};state.started=false;state.finished=false;state.result=null;state.confetti=false;state.wake=nowMin();
+    save();render();document.getElementById("tname").focus();
+  }},{t:"No",g:1}]);
+}
+function wga(){
+  var src=state.tasks.length?state.tasks:((state.rounds&&state.rounds.length)?state.rounds[0].tasks:[]);
+  if(!src.length){modal("We Go Again","Add some tasks first, then repeat them on other days.",null,[{t:"OK"}]);return}
+  var w=document.createElement("div");w.className="wga";var sel={},t=new Date();
+  for(var i=1;i<=30;i++){
+    var d=new Date(t.getFullYear(),t.getMonth(),t.getDate()+i),k=key(d);if(k===selKey)continue;
+    var l=document.createElement("label"),c=document.createElement("input");l.className="chip";c.type="checkbox";
+    c.onchange=(function(k,c){return function(){sel[k]=c.checked}})(k,c);
+    l.appendChild(c);l.appendChild(document.createTextNode(" "+DN[d.getDay()]+" "+d.getDate()+" "+MN[d.getMonth()]));w.appendChild(l);
+  }
+  modal("We Go Again","Repeat this list on the days you pick. Ticks start fresh and fixed times stay.",w,[{t:"Repeat",fn:function(){
+    var ks=Object.keys(sel).filter(function(k){return sel[k]});if(!ks.length)return false;
+    var has=ks.filter(function(k){return store.days[k]&&store.days[k].tasks.length});
+    if(has.length&&!confirm(has.length+" of these days already have tasks. Replace them?"))return false;
+    ks.forEach(function(k){store.days[k]=newDay(clone(src))});save();render();
+  }},{t:"Cancel",g:1}]);
+}
 function ui(){
   var b=document.getElementById("start"),h=new Date().getHours();
-  document.getElementById("hi").textContent=(h<12?"Good morning":h<17?"Good afternoon":"Good evening")+", BABATOMIWA";
-  b.disabled=!!(state.started||state.finished||!viewingToday());
-  b.textContent=state.finished?"Day complete":state.started?"Day started":"Start my day";
-  document.getElementById("started").textContent=!viewingToday()?"Preparing this day. Start opens on the day.":state.finished?"See you tomorrow.":state.started?"Started at "+fmt(state.startAt!==undefined?state.startAt:state.wake):"";
+  document.getElementById("hi").textContent=greet()+", "+nm();
+  b.disabled=false;
+  b.textContent=!viewingToday()?"Go to today":state.finished?"Start another round":state.started?"Day started":"Choose when to start";
+  document.getElementById("started").textContent=!viewingToday()?"Preparing this day. Start opens on the day.":state.finished?"Round complete. Tap Start for more.":state.started?"Started at "+fmt(state.startAt!==undefined?state.startAt:state.wake):"";
   document.getElementById("copy").hidden=!(!viewingToday()&&!state.tasks.length);
   var fx=document.getElementById("tfix").checked;
   ["tname","tdur","tfix","fs","fe","save","cancel"].forEach(function(i){
@@ -307,8 +374,8 @@ function checkEnd(){
   if(!state.finished){r.hidden=true;return}
   var p=state.result;
   document.getElementById("pct").textContent=p+"%";
-  document.getElementById("msg").textContent=p===100?"Perfect day, BABATOMIWA! 🎉":p>=70?"Great work, BABATOMIWA!":p>=40?"Good effort, BABATOMIWA.":"Tomorrow is a fresh start, BABATOMIWA.";
-  document.getElementById("rsub").textContent=state.done+" of "+state.total+" tasks completed";
+  document.getElementById("msg").textContent=p===100?"Perfect day, "+nm()+"! 🎉":p>=70?"Great work, "+nm()+"!":p>=40?"Good effort, "+nm()+".":"Tomorrow is a fresh start, "+nm()+".";
+  document.getElementById("rsub").textContent="Round "+((state.rounds||[]).length+1)+": "+state.done+" of "+state.total+" tasks completed";
   r.hidden=false;
   if(p===100&&!state.confetti){state.confetti=true;save();confetti()}
 }
@@ -324,6 +391,7 @@ function confetti(){
   })();
 }
 load();renderStrip();syncFix();render();
+if(!store.name)askName();else welcome();
 setInterval(render,30000);
 </script>
 </body>
